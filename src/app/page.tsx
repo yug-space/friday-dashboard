@@ -16,30 +16,57 @@ import {
   Loader2,
   RefreshCw,
   Blocks,
+  AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 
 export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [seeding, setSeeding] = useState(false);
 
   const fetchAgents = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('agents')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (fetchError) {
+        setError(fetchError.message);
+        throw fetchError;
+      }
       setAgents(data || []);
-    } catch (error) {
-      console.error('Failed to fetch agents:', error);
-      toast.error('Failed to load agents');
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Failed to fetch agents:', err);
+      toast.error(`Failed to load agents: ${errorMsg}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const seedSampleAgents = async () => {
+    setSeeding(true);
+    try {
+      const response = await fetch('/api/seed');
+      const result = await response.json();
+      if (result.success) {
+        toast.success(`Seeded ${result.count} sample agents`);
+        fetchAgents();
+      } else {
+        toast.error(result.error || 'Failed to seed agents');
+      }
+    } catch (err) {
+      toast.error('Failed to seed agents');
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -214,6 +241,37 @@ export default function Dashboard() {
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">Failed to load agents</h3>
+            <p className="text-sm text-muted-foreground max-w-md mb-4">{error}</p>
+            <Button variant="outline" onClick={fetchAgents}>
+              Try Again
+            </Button>
+          </div>
+        ) : agents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center border rounded-xl bg-card">
+            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+              <Sparkles className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No agents yet</h3>
+            <p className="text-sm text-muted-foreground max-w-md mb-6">
+              Get started by creating your first agent or seed some sample agents.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={seedSampleAgents} disabled={seeding}>
+                {seeding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Seed Sample Agents
+              </Button>
+              <Button onClick={() => setFormOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Agent
+              </Button>
+            </div>
           </div>
         ) : (
           <AgentTable
