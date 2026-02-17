@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { Agent, CreateAgentInput } from '@/types/agent';
 import { AgentTable } from '@/components/agent-table';
 import { AgentForm } from '@/components/agent-form';
@@ -33,19 +32,18 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fetchError } = await supabase
-        .from('agents')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const response = await fetch('/api/agents');
+      const data = await response.json();
 
-      if (fetchError) {
-        setError(fetchError.message);
-        throw fetchError;
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch agents');
       }
+
       setAgents(data || []);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       console.error('Failed to fetch agents:', err);
+      setError(errorMsg);
       toast.error(`Failed to load agents: ${errorMsg}`);
     } finally {
       setLoading(false);
@@ -76,8 +74,17 @@ export default function Dashboard() {
 
   const handleCreate = async (data: CreateAgentInput) => {
     try {
-      const { error } = await supabase.from('agents').insert([data]);
-      if (error) throw error;
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create agent');
+      }
+
       toast.success('Agent created successfully');
       fetchAgents();
     } catch (error) {
@@ -90,11 +97,17 @@ export default function Dashboard() {
   const handleEdit = async (data: CreateAgentInput) => {
     if (!editingAgent) return;
     try {
-      const { error } = await supabase
-        .from('agents')
-        .update(data)
-        .eq('id', editingAgent.id);
-      if (error) throw error;
+      const response = await fetch('/api/agents', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingAgent.id, ...data }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update agent');
+      }
+
       toast.success('Agent updated successfully');
       setEditingAgent(null);
       fetchAgents();
@@ -107,11 +120,15 @@ export default function Dashboard() {
 
   const handleDelete = async (agent: Agent) => {
     try {
-      const { error } = await supabase
-        .from('agents')
-        .delete()
-        .eq('id', agent.id);
-      if (error) throw error;
+      const response = await fetch(`/api/agents?id=${agent.id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete agent');
+      }
+
       toast.success('Agent deleted');
       fetchAgents();
     } catch (error) {
@@ -122,11 +139,17 @@ export default function Dashboard() {
 
   const handleToggle = async (agent: Agent) => {
     try {
-      const { error } = await supabase
-        .from('agents')
-        .update({ enabled: !agent.enabled })
-        .eq('id', agent.id);
-      if (error) throw error;
+      const response = await fetch('/api/agents', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: agent.id, enabled: !agent.enabled }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to toggle agent');
+      }
+
       toast.success(agent.enabled ? 'Agent disabled' : 'Agent enabled');
       fetchAgents();
     } catch (error) {
