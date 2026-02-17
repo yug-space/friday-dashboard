@@ -2,11 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import { Agent, CreateAgentInput } from '@/types/agent';
-import { AgentTable } from '@/components/agent-table';
+import { DashboardLayout } from '@/components/dashboard-layout';
+import { AgentCard } from '@/components/agent-card';
 import { AgentForm } from '@/components/agent-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   Bot,
@@ -14,10 +21,15 @@ import {
   Search,
   Loader2,
   RefreshCw,
-  Blocks,
   AlertCircle,
   Sparkles,
+  LayoutGrid,
+  List,
+  Zap,
+  Globe,
 } from 'lucide-react';
+import { AgentTable } from '@/components/agent-table';
+import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -27,6 +39,8 @@ export default function Dashboard() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [filter, setFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
 
   const fetchAgents = async () => {
     setLoading(true);
@@ -158,14 +172,19 @@ export default function Dashboard() {
     }
   };
 
-  const filteredAgents = searchQuery
-    ? agents.filter(
-        (a) =>
-          a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.slug.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : agents;
+  const filteredAgents = agents
+    .filter((a) => {
+      if (filter === 'enabled') return a.enabled;
+      if (filter === 'disabled') return !a.enabled;
+      return true;
+    })
+    .filter(
+      (a) =>
+        !searchQuery ||
+        a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.slug.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   const stats = {
     total: agents.length,
@@ -174,99 +193,120 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-foreground flex items-center justify-center">
-                <Blocks className="h-5 w-5 text-background" />
-              </div>
+    <DashboardLayout onAddAgent={() => setFormOpen(true)}>
+      <div className="p-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Manage and monitor your AI agents
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="bg-card border rounded-xl p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-semibold tracking-tight">
-                  Friday Agent Dashboard
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Manage and configure AI agents
-                </p>
+                <p className="text-sm text-muted-foreground mb-1">Total Agents</p>
+                <p className="text-3xl font-semibold">{stats.total}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                <Bot className="h-6 w-6 text-muted-foreground" />
               </div>
             </div>
-            <Button onClick={() => setFormOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Agent
+          </div>
+          <div className="bg-card border rounded-xl p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Active</p>
+                <p className="text-3xl font-semibold">{stats.enabled}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                <Zap className="h-6 w-6 text-green-500" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-card border rounded-xl p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Public</p>
+                <p className="text-3xl font-semibold">{stats.public}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <Globe className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-card border rounded-xl p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Inactive</p>
+                <p className="text-3xl font-semibold">{stats.total - stats.enabled}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                <Bot className="h-6 w-6 text-muted-foreground" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-between mb-6 gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search agents..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="enabled">Enabled</SelectItem>
+                <SelectItem value="disabled">Disabled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center border rounded-lg p-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn('h-8 w-8', viewMode === 'grid' && 'bg-muted')}
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn('h-8 w-8', viewMode === 'list' && 'bg-muted')}
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button variant="outline" onClick={fetchAgents} disabled={loading}>
+              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             </Button>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-card border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                <Bot className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{stats.total}</div>
-                <div className="text-sm text-muted-foreground">Total Agents</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-card border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-background" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{stats.enabled}</div>
-                <div className="text-sm text-muted-foreground">Enabled</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-card border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                <Blocks className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{stats.public}</div>
-                <div className="text-sm text-muted-foreground">Public</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Separator className="mb-8" />
-
-        {/* Search & Actions */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="relative w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search agents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Button variant="outline" onClick={fetchAgents} disabled={loading}>
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`}
-            />
-            Refresh
-          </Button>
-        </div>
-
-        {/* Table */}
+        {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
               <AlertCircle className="h-8 w-8 text-destructive" />
             </div>
@@ -277,13 +317,13 @@ export default function Dashboard() {
             </Button>
           </div>
         ) : agents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center border rounded-xl bg-card">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-              <Sparkles className="h-8 w-8 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-20 text-center border rounded-2xl bg-card">
+            <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-6">
+              <Sparkles className="h-10 w-10 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-medium mb-2">No agents yet</h3>
-            <p className="text-sm text-muted-foreground max-w-md mb-6">
-              Get started by creating your first agent or seed some sample agents.
+            <h3 className="text-xl font-semibold mb-2">No agents yet</h3>
+            <p className="text-muted-foreground max-w-md mb-8">
+              Get started by creating your first agent or seed some sample agents to explore.
             </p>
             <div className="flex gap-3">
               <Button variant="outline" onClick={seedSampleAgents} disabled={seeding}>
@@ -296,6 +336,18 @@ export default function Dashboard() {
               </Button>
             </div>
           </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-3 gap-4">
+            {filteredAgents.map((agent) => (
+              <AgentCard
+                key={agent.id}
+                agent={agent}
+                onEdit={(a) => setEditingAgent(a)}
+                onDelete={handleDelete}
+                onToggle={handleToggle}
+              />
+            ))}
+          </div>
         ) : (
           <AgentTable
             agents={filteredAgents}
@@ -304,7 +356,7 @@ export default function Dashboard() {
             onToggle={handleToggle}
           />
         )}
-      </main>
+      </div>
 
       {/* Create Form */}
       <AgentForm
@@ -324,6 +376,6 @@ export default function Dashboard() {
           mode="edit"
         />
       )}
-    </div>
+    </DashboardLayout>
   );
 }
